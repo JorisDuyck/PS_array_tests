@@ -1,0 +1,113 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Joris Duyck
+// Various functions to use 1D Pinescript arrays as 2D matrices
+//
+// The functions here can be used to:
+// - retrieve dimensions info from the array
+// - initialise an array with a header containing the dimensional info
+// - set values in the array with (x, y) coordinates
+// - get values in the array with (x, y) coordinates
+// - convert 1d array indeces to (x, y) coordinates and vice versa
+
+//@version=4
+study("Matrix functions -  test")
+
+/// MATRIX INFO FUNCTIONS ///
+//{
+
+// OK! function to get total number of columns from a 2D matrix
+//{
+f_array2D_get_columns(_m) =>
+    _columns = int(array.get(_m, 0))
+    _columns
+//}
+
+// OK! function to get total number of rows from a 2D matrix
+//{
+f_array2D_get_rows(_m) =>
+    _rows    = int(array.get(_m, 1))
+    _rows
+//}
+
+// OK! function to get total number of columns and rows from a 2D matrix
+//{
+f_array2D_get_size(_m) =>
+    _columns = int(array.get(_m, 0))
+    _rows    = int(array.get(_m, 1))
+    [_columns, _rows]
+//}
+//}
+
+/// INITIALISATION AND SET FUNCTIONS ///
+//{
+// 2D matrix init function, builds 2D matrix with dimensional metadata in first two values
+//{
+f_array2D_init(_x, _y, _fill) =>
+    _size  = int(_x * _y)
+    _m     = array.new_float(_size + 2, _fill)
+    array.set(_m, 0, _x), array.set(_m, 1, _y)
+    _m
+//}
+
+// function to set values in 2D matrix with (x, y) (index for x and y both starts at 0 !!)
+//{
+f_array2D_set(_m, _x, _y, _val) =>
+    _columns = f_array2D_get_columns(_m)
+    array.set(_m, 2 + int(_x + (_y * _columns)), _val)
+//}
+//}
+
+/// GET FUNCTIONS ///
+//{
+// function to get values from 2D matrix with (x, y) (index for x and y both starts at 0 !!)
+//{
+f_array2D_get(_m, _x, _y) =>
+    _columns = f_array2D_get_columns(_m)
+    _val     = array.get(_m, 2 + int(_x + (_y * _columns)))
+    _val
+//}
+
+// function to cut of the metadata header and return the array body
+//{
+f_array_get_body(_m) =>
+    _array_body = array.copy(_m)
+    for i = 0 to 1
+        array.remove(_array_body, 0)
+    _array_body
+//}
+
+/// 1D <=> 2D COORDINATE CONVERSION FUNCTIONS (handy with for loop indexes) ///
+//{
+// OK! function to get x coordinate from 2D matrix from 1D index (index for x and y both starts at 0 !!)
+//{
+f_array2D_get_x(_m, _index) =>
+    _columns = f_array2D_get_columns(_m)
+    _x       = _index % _columns
+    _x
+//}
+
+// OK! function to get y coordinate in 2D matrix from 1D index (index for x and y both starts at 0 !!)
+//{
+f_array2D_get_y(_m, _index) =>
+    _columns = f_array2D_get_columns(_m)
+    _y       = floor(_index / _columns)
+    _y
+//}
+
+// OK! function to get( x, y) coordinates in 2D matrix from 1D index (index starts at 0 and does not include the header!!)
+//{
+f_array2D_get_xy(_m, _index) =>
+    _columns = f_array2D_get_columns(_m)
+    _x = (_index % _columns)
+    _y = floor(_index / _columns)
+    [_x, _y]
+//}
+
+// OK! function to get 1D index from ( x, y) coordinates in 2D matrix (index for x and y both starts at 0 !! Index starts at 0 and does not include the header!!)
+//{
+f_array2D_get_index(_m, _x, _y) =>
+    _columns = f_array2D_get_columns(_m)
+    _index   = _x + _y * _columns
+//}
+//}
+//}
