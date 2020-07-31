@@ -2,6 +2,11 @@
 // © Joris Duyck
 // Various functions to use 1D Pinescript arrays as 2D matrices
 //
+// The arrays are declared in the following way:
+// (header with dimensional metadata)  (body of the matrix, containing the actual data)
+// [number_of_columns, number_of_rows, value(x0,y0), value(x1,y0), value(x2,y0), value(x0,y1), value(x1,y1),...]
+//
+//
 // The functions here can be used to:
 // - retrieve dimensions info from the array
 // - initialise an array with a header containing the dimensional info
@@ -111,3 +116,22 @@ f_array2D_get_index(_m, _x, _y) =>
 //}
 //}
 //}
+
+// OK! function to print matrix
+//{
+f_array2D_print(_m) =>
+    _text = "(" + tostring(array.get(_m, 0)) + "x" + tostring(array.get(_m, 1)) + ")"
+    _text := _text + "\n" + "\n"+"["
+    for i = 2 to array.size(_m) - 1 
+        _text := _text + (i == 2 ? "" : ((i -2) % array.get(_m, 0)) == 0 ? "]" + "\n" + "[" : " ") + tostring(array.get(_m, i))
+    _text := _text + "]"
+//}
+
+/// ARRAY SET AND PRINT EXAMPLE //
+
+a = f_array2D_init(2, 3, 0)
+for i = 0 to 5
+    array.set(a, 2 + i, i)
+
+var label lbl_a = na, label.delete(lbl_a)
+lbl_a := label.new(bar_index - 0, 0, text = f_array2D_print(a))
