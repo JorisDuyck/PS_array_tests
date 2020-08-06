@@ -132,13 +132,14 @@ array.set(new_record, 2, 30)
 
 // parameters to check behavior of functions
 //{
-x = input(0, title="sheet index")
-y = input(0, title="row index")
+x = input(1, title="record insert sheet index")
+y = input(0, title="record get sheet index")
+z = input(1, title="record get row index")
 //}
 
 c = f_3D_array_add_new_record(a, 1, new_record) 
 // c := f_3D_array_add_new_record(a, x, new_record) 
-e = f_3D_array_get_record(a, x, y)
+e = f_3D_array_get_record(a, y, z)
 
 // plot matrices
 //{
