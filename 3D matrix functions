@@ -25,8 +25,8 @@ study("3D_array_datastructure functions")
 //  
 //            0           1           2           3                   column_index
 //  0    record0_val0, record0_val1, record0_val2, record0_val3, ...,
-//  1    record0_val0, record0_val1, record0_val2, record0_val3, ...,
-//  2    record0_val0, record0_val1, record0_val2, record0_val3, ...,
+//  1    record1_val1, record1_val1, record1_val2, record1_val3, ...,
+//  2    record2_val0, record2_val1, record2_val2, record2_val3, ...,
 //  3    ...
 //
 // row_index
@@ -35,8 +35,8 @@ study("3D_array_datastructure functions")
 //           
 //                      0           1           2           3                   column_index
 //           0    record0_val0, record0_val1, record0_val2, record0_val3, ...,
-//           1    record0_val0, record0_val1, record0_val2, record0_val3, ...,
-//           2    record0_val0, record0_val1, record0_val2, record0_val3, ...,
+//           1    record1_val0, record1_val1, record1_val2, record1_val3, ...,
+//           2    record2_val0, record2_val1, record2_val2, record2_val3, ...,
 //           3    ...
 //          
 //          row_index
@@ -45,8 +45,8 @@ study("3D_array_datastructure functions")
 //                        
 //                                   0           1           2           3                   column_index
 //                        0    record0_val0, record0_val1, record0_val2, record0_val3, ...,
-//                        1    record0_val0, record0_val1, record0_val2, record0_val3, ...,
-//                        2    record0_val0, record0_val1, record0_val2, record0_val3, ...,
+//                        1    record1_val0, record1_val1, record1_val2, record1_val3, ...,
+//                        2    record2_val0, record2_val1, record2_val2, record2_val3, ...,
 //                        3    ...                                                          ]
 //                       
 //                       row_index
