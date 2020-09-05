@@ -1,0 +1,616 @@
+//@version=4
+//
+//{
+// 
+////////////////////////////////////
+/// BASIC INFO ON THE DATAFRAME: ///
+////////////////////////////////////
+// 
+// The df is set up as an EXCELL workbook and is devided in SHEETS, ROWS/RECORDS and COLUMNS.
+//
+// With the use of some purpose-built functions, values can be placed or retrieved in a specific column of a certain row on a certain sheet
+//  this can be done by intuitively using sheet_nr, row_nr and column_nr coördinates,
+//  without having to worry on what exact index of the Pine array this value is located (the functions do these conversions for you)
+//
+//
+// the syntax I propose for the 3D dataframe array has the following structure:
+// 
+//  - the array starts with 3 VALUES describing the DIMENSION INFORMATION, (nr of sheets, rows, columns)
+//      these are ignored in the actual calculations and serve as a metadata header (similar to the "location, time,... etc." data that is stored in photo files)
+//      so the array always carries it's own info about the nr. of sheets, rows and columns and doesn't need is seperate "info" file!
+//
+//      To stay consistent with the standard Pinescript (array and [lookback]) indexing:
+//      - indexes for sheets and columns start from 0 (first) and run up to the (total nr of sheets or columns) - 1
+//      - indexes for rows also start from 0 (most recent, cfr.[lookback]) and run up to the (total nr of rows) - 1
+// 
+//  - this 3 value metadata header is followed by the actual df data
+//      the actual data array can consist of (100,000 - 3) usable items,
+//      
+//      In a practical example, you can have a df with 3 sheets, containing 6,666 rows with each 5 columns of data (eg. open, high, low, close, volume) in it!!!
+//
+///////////////////////////////////
+/// SCHEMATIC OF THE STRUCTURE: ///
+///////////////////////////////////
+//
+////// (header with dimensions info)
+//
+// [nr_of_sheets, nr_of_rows/records, nr_of_columns,
+//
+////// (actual array data)
+// 
+//          SHEET 0
+//  
+//            0           1           2           3                   column_index
+//  0    record0_val0, record0_val1, record0_val2, record0_val3, ...,
+//  1    record1_val0, record1_val1, record1_val2, record1_val3, ...,
+//  2    record2_val0, record2_val1, record2_val2, record2_val3, ...,
+//  3    ...
+//
+// row_index
+//                   SHEET 1
+//           
+//                      0           1           2           3                   column_index
+//           0    record0_val0, record0_val1, record0_val2, record0_val3, ...,
+//           1    record1_val0, record1_val1, record1_val2, record1_val3, ...,
+//           2    record2_val0, record2_val1, record2_val2, record2_val3, ...,
+//           3    ...
+//          
+//          row_index
+//                                SHEET 2
+//                        
+//                                   0           1           2           3                   column_index
+//                        0    record0_val0, record0_val1, record0_val2, record0_val3, ...,
+//                        1    record1_val0, record1_val1, record1_val2, record1_val3, ...,
+//                        2    record2_val0, record2_val1, record2_val2, record2_val3, ...,
+//                        3    ...                                                          ]
+//                       
+//                       row_index
+//
+////////////////////////////////////
+/// DATA MANIPULATION FUNCTIONS: ///
+////////////////////////////////////
+//
+// A set of functions are implemented to write info to and retrieve info from the dataframe.
+//  Of course the possibilities are not limited to the functions here, these were written because they were needed for the script!
+//  A whole list of other functions can be easily written for other manipulation purposes.
+//
+//
+// LIST OF FUNCTIONS contained in this script:
+// 
+// - Dataframe initialisation function, builds 3D matrix with dimensional metadata/size in first 3 values //
+//      a new df array is built (cfr. the conventions I propose above) containing a certain nr of sheets, records and columns
+//
+// - function to get dimensional info from 3D matrix
+//      This function returns the nr of sheets, rows and columns in the df
+// 
+// - function to get a sheet start and end index from 3D matrix
+//      This is mainly used for 1D to 3D index conversions
+//
+// - function to add a record on the top of a sheet, shift the whole list one down and remove the oldest record
+//      (2D version of "unshift" + "pop" but with a whole row at once)
+//
+// - function to retrieve the values from a record from a certain row/lookback period
+//      The values are returned as an array
+//
+// - function to get/retrieve a single value from a certain sheet, row/lookback period and column
+//
+// - function to set a single value in a certain sheet, row/lookback period and column
+//
+// - function to print the matrix
+//      This function is mainly used for debugging purposes and displays the array as a 2D matrix notation
+//
+//
+// Enjoy!
+// JD.
+//
+// #NotTradingAdvice #DYOR
+//
+//  Disclaimer.
+// I AM NOT A FINANCIAL ADVISOR.
+// THESE IDEAS ARE NOT ADVICE AND ARE FOR EDUCATION PURPOSES ONLY.
+// ALWAYS DO YOUR OWN RESEARCH!
+//}
+
+study(title = "Sudoku solver - JD", shorttitle = "soduku solver", overlay = false)
+
+/////// Input variables ///////
+//{
+int row_01 = input(defval=000700090, minval=0, maxval=999999999)
+int row_02 = input(defval=009030060, minval=0, maxval=999999999)
+int row_03 = input(defval=800600432, minval=0, maxval=999999999)
+int row_04 = input(defval=700003600, minval=0, maxval=999999999)
+int row_05 = input(defval=020070050, minval=0, maxval=999999999)
+int row_06 = input(defval=008500007, minval=0, maxval=999999999)
+int row_07 = input(defval=981007006, minval=0, maxval=999999999)
+int row_08 = input(defval=040090200, minval=0, maxval=999999999)
+int row_09 = input(defval=060005000, minval=0, maxval=999999999)
+solve      = input(true,  title = "solve puzzle?")
+//}
+
+/////// Initialisations ///////
+//{
+
+//}
+
+/////// Function declarations ///////
+//{
+// Psuedo random number generator, by @RicardoSantos
+//{
+//| -------------------------------------------------------------------------------|
+var float[] seed = array.new_float(size=1, initial_value=42.0)                  //-|
+f_prng(_range)=>                                                              //---|
+//| pseudo random function:                                                 // O O |
+    var float _return = 1.0                                                 //- V -|
+    float _seed = array.get(id=seed, index=0)                                //NNNN|
+    float _reseed =  271.828                                                  // A |
+    _return := ((3.1416 * _return % _seed) * _reseed) % _range                // V |
+    array.set(id=seed, index=0, value=(1 + (_seed * 1.618) % _range) + _return) //||
+    _return                                                                    // ||
+//| -------------------------------------------------------------------------------|
+//}
+
+f_sudoku_check_cell_validity(_T, _value, _x, _y)=>
+//{
+//| Check if a input value is valid on a Sudoku array(81 elements)
+    bool _is_size_ok = array.size(id=_T) == 81
+    bool _is_lines_valid = true
+    bool _is_box_valid = true
+    string _msg = ''
+    if _is_size_ok
+        for _i = 0 to 8
+            bool _is_value_in_row = array.get(id=_T, index=(_y * 9) + _i) == _value
+            bool _is_value_in_col = array.get(id=_T, index=(_i * 9) + _x) == _value
+            if _is_value_in_row 
+                _is_lines_valid := false
+                _msg := 'Value ' + tostring(_value, '#') + ' present in row at cell: ' + tostring((_y * 9) + _i, '#')
+                break
+            if _is_value_in_col
+                _is_lines_valid := false
+                _msg := 'Value ' + tostring(_value, '#') + ' present in col at cell: ' + tostring((_i * 9) + _x, '#')
+                break
+        if _is_lines_valid
+            int _startX = floor(_x / 3) * 3 //(_x / 3) * 3
+            int _startY = floor(_y / 3) * 3 //(_y / 3) * 3
+            for _i = _startY to _startY + 3
+                for _j = _startX to _startX + 3
+                    bool _is_value_in_box = array.get(id=_T, index=(_i * 9) + _j) == _value
+                    if _is_value_in_box
+                        _is_box_valid := false
+                        _msg := 'Value ' + tostring(_value, '#') + ' present in box group.'
+                        break
+    [_is_size_ok and _is_lines_valid and _is_box_valid, _msg]
+//}
+
+f_row_to_digits(_row)=>
+//{//| Return a array containing each digit as a element from a integer value
+//|     (ex: 01025 --> [0,1,0,2,5])
+    int[] _R = array.new_int(size=0, initial_value=0)
+    int _value = _row
+    for _i = 8 to 0
+        _value := int((_row / pow(10, _i) % 10))
+        array.push(id=_R, value=_value)
+    _R
+//}
+
+update_row(_T, _S, _n_row, _row)=>
+//{
+//| Update a row in a array containing Sudoku table
+    int[] _R = f_row_to_digits(_row)
+    string _msg = ''
+    for _i = 8 to 0
+        int _value = array.get(id=_R, index=_i)
+        [_ok, _m] = f_sudoku_check_cell_validity(_S, _value, _i, _n_row)
+        if _ok
+            array.set(id = _T, index=(_n_row * 9) + _i, value = _value)
+            _msg
+        else
+            _msg := _msg + '\n' + _m
+    _msg
+//}
+
+/// DATAFRAME STRUCTURE FUNCTIONS ///
+//{
+/////////////////////////////////////////
+// Initialisation and helper functions //
+/////////////////////////////////////////
+//{
+// Dataframe initialisation function, builds 3D dataframe with dimensional metadata (size) in first 3 values //
+f_df_array_new(_type, _nr_of_sheets, _nr_of_rows, _nr_of_columns, _fill) => // returns an array
+// _type should be set as a string with either "int", "float", "color or "bool"
+// _fill should be set according to the correct type
+//{
+    _array_size =  3 + _nr_of_sheets * _nr_of_rows * _nr_of_columns
+    
+    _df_int   = array.new_int(  _array_size, int(_fill))
+    _df_float = array.new_float(_array_size,     _fill )
+    _df_color = array.new_color(_array_size            )
+    _df_bool  = array.new_bool( _array_size,     _fill )
+    
+    _df =
+     _type == "int"   ?  array.copy(_df_int)   :
+     _type == "float" ?  array.copy(_df_float) :
+     _type == "color" ?  array.copy(_df_color) :
+                         array.copy(_df_bool)
+    array.set(_df, 0, _nr_of_sheets), array.set(_df, 1, _nr_of_rows), array.set(_df, 2, _nr_of_columns)
+    _df
+//}
+
+// helper function to get dimensional info from 3D matrix
+f_df_array_get_size(_m) => // returns [_nr_of_sheets, _nr_of_rows, _nr_of_columns]
+//{
+    _nr_of_sheets  = int(array.get(_m, 0))
+    _nr_of_rows    = int(array.get(_m, 1))
+    _nr_of_columns = int(array.get(_m, 2))
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns]
+//}
+
+// helper function to get a sheet start and end index from 3D matrix
+f_df_array_get_sheet_index_range(_m, _sheet_index) => // returns [_start_index, _end_index]
+//{
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns] = f_df_array_get_size(_m)
+    _start_index = 3 + min(_sheet_index, (_nr_of_sheets - 1)) * _nr_of_rows * _nr_of_columns
+    _end_index   = _start_index + _nr_of_rows * _nr_of_columns - 1
+    [_start_index, _end_index]
+//}
+//}
+
+/////////////////////////////////
+// Data manipulation functions //
+/////////////////////////////////
+//{
+/////////////////////////////////
+// function to ADD a RECORD on the top of a sheet and remove the oldest record
+// (to keep the dataframe in the correct size)
+// ("sheet_index" goes from 0 (first) to 1, 2, ...)
+//
+f_df_array_add_new_record(_df, _sheet_index, _record) =>
+// _record should be of array type with the correct size (nr of columns)
+//{
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns] = f_df_array_get_size(_df)
+    if array.size(_record) == _nr_of_columns
+        [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, _sheet_index)
+        _sheet = array.slice(_df, _sheet_start_index, _sheet_end_index + 1)
+        for i = (_nr_of_columns - 1) to 0
+            array.unshift(_sheet, array.get(_record, i))
+            array.pop(_sheet)
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to DELETE a RECORD from the dataframe
+// "sheet_index" goes from 0 (first) to 1, 2, ...
+// "row_index" goes from 0 (latest) to 1, 2, ...(oldest)
+//
+f_df_array_delete_record(_df, _sheet_index, _row_index, _shift_up) =>
+// us "no shift" to replace the selected record values with '0'
+// or "shift up" to shift all the other records one place up
+//{
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns] = f_df_array_get_size(_df)
+    [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, min(_nr_of_sheets - 1, _sheet_index))
+    _start_index  = _sheet_start_index + min(_nr_of_rows - 1, _row_index) * _nr_of_columns 
+    for i = 0 to _nr_of_columns - 1
+        if _shift_up == "shift up"
+            array.remove(_df, _start_index + i)
+            array.insert(_df, _sheet_end_index - _nr_of_columns + 1, 0)
+        else
+            array.set(_df, _start_index + i, 0)
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to RETRIEVE the values from a RECORD (either as a copy or a slice, packed in an array)
+// from a certain row/lookback period
+// "sheet_index" goes from 0 (first) to 1, 2, ...
+// "row_index" goes from 0 (latest) to 1, 2, ...(oldest)
+//
+f_df_array_copy_slice_record(_df, _sheet_index, _row_index, _do_slice) => // returns the record as an array
+// enter "copy" or "slice" as a string  as the last argument
+//{
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns] = f_df_array_get_size(_df)
+    [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, min(_nr_of_sheets - 1, _sheet_index))
+    _start_index  = _sheet_start_index + min(_nr_of_rows - 1, _row_index) * _nr_of_columns 
+    _record_slice = array.slice(_df, _start_index, _start_index + min(_sheet_end_index + 1, _nr_of_columns))
+    _record       = _do_slice == "slice" ? _record_slice : array.copy(_record_slice)
+    _record
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to RETRIEVE the values from a COLUMN (as a copy, packed in an array)
+// from a certain sheet
+// ("sheet_index" goes from 0 (first) to 1, 2, ...
+// "row_index" goes from 0 (latest) to 1, 2, ...(oldest) )
+//
+f_df_array_copy_column(_df, _sheet_index, _column_index) => // returns the column as an array
+//{
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns] = f_df_array_get_size(_df)
+    [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, min(_nr_of_sheets - 1, _sheet_index))
+    _start_index  = _sheet_start_index + _column_index
+    _record = array.new_float(_nr_of_rows)
+    for i = 0 to _nr_of_rows - 1
+        array.push(_record, array.get(_df, _start_index + i * _nr_of_columns + min(_nr_of_columns, _column_index)))
+    _record
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to make a COPY OR SLICE from a whole SHEET (packed in an array) ("sheet_index" goes from 0 (first) to 1, 2, ... )//
+f_df_array_copy_slice_sheet(_df, _sheet_index, _do_slice) => // returns the sheet as an array
+// enter "copy" or "slice" as a string as the last argument
+//{
+    [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, _sheet_index)
+    _sheet_slice = array.slice(_df, _sheet_start_index, _sheet_end_index + 1)
+    _return_sheet = _do_slice == "slice" ? _sheet_slice : array.copy(_sheet_slice)
+    _return_sheet
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to retrieve the values (packed in an array) from a z-stack of the same (row, column) coördinates
+// from a certain sheet to a certain sheet
+// ("sheet_index" goes from 0 (first) to 1, 2, ... )
+//
+f_df_array_get_z_stack(_df, _from_sheet_index, _to_sheet_index, _row_index, _column_index) => // returns the z-stack as an array
+//{
+    [_nr_of_sheets, _nr_of_rows, _nr_of_columns] = f_df_array_get_size(_df)
+    [_sheet_start_index, _void_end] = f_df_array_get_sheet_index_range(_df, min(_nr_of_sheets - 1, _from_sheet_index))
+    [_void_start, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, min(_nr_of_sheets - 1, _to_sheet_index))
+    _value_index  = _sheet_start_index + _row_index * _nr_of_columns + _column_index
+    _record = array.new_float()
+    for i = _from_sheet_index to _to_sheet_index
+        array.push(_record, array.get(_df, _value_index + i * _nr_of_columns * _nr_of_columns))
+    _record
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to GET/retrieve a SINGLE VALUE from a certain sheet, (row/lookback period, column)
+// "sheet_index" goes from 0 (first) to 1, 2, ...
+// "row_index" goes from 0 (latest) to 1, 2, ...(oldest)
+// "column_index" goes from 0 (first) to 1, 2, ..., )
+//
+f_df_array_get(_df, _sheet_index, _row_index, _column_index) => // returns a single value
+//{
+    _record = f_df_array_copy_slice_record(_df, _sheet_index, _row_index, "copy")
+    _value = array.get(_record, _column_index)
+    _value
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to SET a SINGLE VALUE in a certain sheet, (row/lookback period, column)
+// "sheet_index" goes from 0 (first) to 1, 2, ...
+// "row_index" goes from 0 (latest) to 1, 2, ...(oldest)
+// "column_index" goes from 0 (first) to 1, 2, ..., )
+//
+f_df_array_set(_df, _sheet_index, _row_index, _column_index, _value) =>
+//{
+    _record = f_df_array_copy_slice_record(_df, _sheet_index, _row_index, "slice")
+    array.set(_record, _column_index, _value)
+//}
+/////////////////////////////////
+
+/////////////////////////////////
+// function to FILL a whole SHEET with a certain value, (row/lookback period, column)
+// "sheet_index" goes from 0 (first) to 1, 2, ...
+f_df_array_fill_sheet(_df, _sheet_index, _fill) =>
+//{
+    [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_df, _sheet_index)
+    array.fill(_df, _fill, _sheet_start_index, _sheet_end_index)
+//} 
+/////////////////////////////////
+//}
+/////////////////////////////////
+//}
+
+/// SUDOKU FUNCTIONS ///
+//{
+f_remove_filled_spaces(_array) =>
+//{
+    for _sheet_index = 1 to 9
+        [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(_array, _sheet_index)
+        for i = 0 to 80
+            if array.get(_array, 3 + i) != 0
+                array.set(_array, _sheet_start_index + i, 0)
+//}
+f_remove_invalid_rows_and_columns(_array) =>
+//{
+    var int _number_val = 0
+    for i = 0 to 80
+        _number_val := array.get(_array, 3 + i)
+        if _number_val != 0
+            for j = 0 to 8
+            // remove row values         // sheet nr. //     // row nr. //                // column nr. //
+                f_df_array_set(_array,     _number_val,       floor(i / 9)             ,          j                , 0)
+            // remove column values      // sheet nr. //     // row nr. //                // column nr. //
+                f_df_array_set(_array,     _number_val,            j                   ,       (i % 9)             , 0)
+//}
+f_remove_invalid_boxes(_array) =>
+//{
+    var int _number_val = 0
+    for i = 0 to 80
+        _number_val := array.get(_array, 3 + i)
+        if _number_val != 0
+            for k = 0 to 2
+                for l = 0 to 2
+            // remove 3x3 box values     // sheet nr. //      // row nr. //                // column nr. //
+                    f_df_array_set(_array, _number_val, floor(floor(i / 9) / 3) * 3 + k, floor((i % 9) / 3) * 3 + l, 0)
+//}
+//}
+//}
+
+/////// Start of main script ///////
+//{
+////// Initialise the 3D array containing the Sudoku values //////
+//{
+//////////////////////////////
+//// set array dimensions ////
+nr_of_sheets      = 10
+nr_of_rows        = 9
+nr_of_columns     = 9
+//////////////////////////////
+////     sheet names     ////
+sudoku_grid           = 0
+available_spots_for_1 = 1, available_spots_for_2 = 2, available_spots_for_3 = 3
+available_spots_for_4 = 4, available_spots_for_5 = 5, available_spots_for_6 = 6
+available_spots_for_7 = 7, available_spots_for_8 = 8, available_spots_for_9 = 9
+//////////////////////////////
+////       row names      ////
+row_1 = 0, row_2 = 1, row_3 = 2
+row_4 = 3, row_5 = 4, row_6 = 5
+row_7 = 6, row_8 = 7, row_9 = 8
+//////////////////////////////
+//////////////////////////////
+////     column names     ////
+col_1 = 0, col_2 = 1, col_3 = 2
+col_4 = 3, col_5 = 4, col_6 = 5
+col_7 = 6, col_8 = 7, col_9 = 8
+//////////////////////////////
+
+//// build dataframe array
+var int[] Sudoku = f_df_array_new("int", nr_of_sheets, nr_of_rows, nr_of_columns, 0)
+
+// fill sheets 1 to 9 with corresponding number values
+for i = 1 to 9
+    f_df_array_fill_sheet(Sudoku, i, i)
+/////////////////////////////////////////////////////////////////////
+//}
+
+/////// create array to keep track of numbers added and another to store original values. ///////
+// var int[] S = array.new_int(size=81, initial_value=0)
+// var int[] C = array.copy(id = Sudoku)
+// var int[] S = f_df_array_copy_slice_sheet(Sudoku, 0, "slice")
+// var int[] C = array.copy(id = S)
+
+//  initial number population inputs
+// int number_of_initial_population = input(defval=12, minval=0, maxval=80)
+// int population_seed              = input(defval=0)
+
+//  populate the sudoku table
+//{
+int[] R1 = f_row_to_digits(row_01)
+int[] R2 = f_row_to_digits(row_02)
+int[] R3 = f_row_to_digits(row_03)
+int[] R4 = f_row_to_digits(row_04)
+int[] R5 = f_row_to_digits(row_05)
+int[] R6 = f_row_to_digits(row_06)
+int[] R7 = f_row_to_digits(row_08)
+int[] R8 = f_row_to_digits(row_07)
+int[] R9 = f_row_to_digits(row_09)
+
+for i = 0 to 8
+    array.set(Sudoku, 3 + i        , array.get(id=R1, index=i))
+    array.set(Sudoku, 3 + i + 1 * 9, array.get(id=R2, index=i))
+    array.set(Sudoku, 3 + i + 2 * 9, array.get(id=R3, index=i))
+    array.set(Sudoku, 3 + i + 3 * 9, array.get(id=R4, index=i))
+    array.set(Sudoku, 3 + i + 4 * 9, array.get(id=R5, index=i))
+    array.set(Sudoku, 3 + i + 5 * 9, array.get(id=R6, index=i))
+    array.set(Sudoku, 3 + i + 6 * 9, array.get(id=R7, index=i))
+    array.set(Sudoku, 3 + i + 7 * 9, array.get(id=R8, index=i))
+    array.set(Sudoku, 3 + i + 8 * 9, array.get(id=R9, index=i))
+//}
+
+// if bar_index == population_seed
+//     array.set(id=seed, index=0, value=1 + bar_index)
+//     for _i = 0 to max(0, min(80, number_of_initial_population))
+//         array.set(id=Sudoku, index=3 + int(f_prng(80)), value=int(1+f_prng(8)))
+//     //C := array.copy(id=S)
+    //if uncomment the above line the values on the original array S are reseted to 0
+
+//print Sudoku
+f_print_sudoku(_sheet_index)=>
+//{
+    string t = ''
+    [_sheet_start_index, _sheet_end_index] = f_df_array_get_sheet_index_range(Sudoku, _sheet_index)
+    for _i = 0 to 80
+        t := t + tostring(array.get(id=Sudoku, index=_sheet_start_index +_i))
+        if _i % 9 == 8 and _i != 80
+            t := t + '\n'
+            if _i == 26 or _i == 53
+                t := t + '\n―――――――――\n'
+        else if _i % 3 == 2 and _i != 80
+            t := t + ' | '
+        else
+            t := t
+    t
+//}
+
+// remove unvalid items from initial Sudoku
+f_remove_filled_spaces(Sudoku)
+f_remove_invalid_rows_and_columns(Sudoku)
+f_remove_invalid_boxes(Sudoku)
+
+// // check for single values in numbers sheets
+// f_check_single_val_in_rows_and_columns(Sudoku, Solution)
+// f_check_single_val_in_boxes(Sudoku, Solution)
+
+// LAYOUT //
+//{
+txt_Sudoku = f_print_sudoku(sudoku_grid)
+txt_nr_1   = f_print_sudoku(available_spots_for_1)
+txt_nr_2   = f_print_sudoku(available_spots_for_2)
+txt_nr_3   = f_print_sudoku(available_spots_for_3)
+txt_nr_4   = f_print_sudoku(available_spots_for_4)
+txt_nr_5   = f_print_sudoku(available_spots_for_5)
+txt_nr_6   = f_print_sudoku(available_spots_for_6)
+txt_nr_7   = f_print_sudoku(available_spots_for_7)
+txt_nr_8   = f_print_sudoku(available_spots_for_8)
+txt_nr_9   = f_print_sudoku(available_spots_for_9)
+
+var label debug0 = label.new(bar_index, 0.0, '', color = color.white, style = label.style_label_center)
+label.set_xy(id=debug0, x=bar_index - 100, y=0.0)
+label.set_text(id=debug0, text=txt_Sudoku)
+
+var label debug1 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug1, x=bar_index - 90, y=-1.0)
+label.set_text(id=debug1, text=txt_nr_1)
+
+var label debug2 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug2, x=bar_index - 80, y=-2.0)
+label.set_text(id=debug2, text=txt_nr_2)
+
+var label debug3 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug3, x=bar_index - 70, y=-3.0)
+label.set_text(id=debug3, text=txt_nr_3)
+
+var label debug4 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug4, x=bar_index - 60, y=-4.0)
+label.set_text(id=debug4, text=txt_nr_4)
+
+var label debug5 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug5, x=bar_index - 50, y=-5.0)
+label.set_text(id=debug5, text=txt_nr_5)
+
+var label debug6 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug6, x=bar_index - 40, y=-6.0)
+label.set_text(id=debug6, text=txt_nr_6)
+
+var label debug7 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug7, x=bar_index - 30, y=-7.0)
+label.set_text(id=debug7, text=txt_nr_7)
+
+var label debug8 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug8, x=bar_index - 20, y=-8.0)
+label.set_text(id=debug8, text=txt_nr_8)
+
+var label debug9 = label.new(bar_index, 0.0, '', color = color.yellow, style = label.style_label_center)
+label.set_xy(id=debug9, x=bar_index - 10, y=-9.0)
+label.set_text(id=debug9, text=txt_nr_9)
+//}
+
+
+//{
+// // t_v = input(0), t_x = input(0), t_y = input(0)
+// // [test, _m] = f_sudoku_check_cell_validity(S, t_v, t_x, t_y)
+// // plot(test?1:0)
+
+// // _m :=  update_row(S, C, 0, row_01)
+// // _m := _m + update_row(S,C, 1, row_02)
+// // _m := _m + update_row(S,C, 2, row_03)
+// // _m := _m + update_row(S,C, 3, row_04)
+// // _m := _m + update_row(S,C, 4, row_05)
+// // _m := _m + update_row(S,C, 5, row_06)
+// // _m := _m + update_row(S,C, 6, row_07)
+// // _m := _m + update_row(S,C, 7, row_08)
+// // _m := _m + update_row(S,C, 8, row_09)
+//}
