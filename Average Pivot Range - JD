@@ -1,0 +1,172 @@
+//@version=4
+//
+/////////////////////////////////////////////////////
+/// © Copyright 2019 to present, Joris Duyck (JD) ///
+/////////////////////////////////////////////////////
+//
+// The "Average Pivot Indicator" is an alternative to the "Average True Range"
+// and is based in "pivot points" calculated with a Jurik ma, (same as the "Zero-Lag"ZigZag")
+// the indicator calculates the range in the price swing between the two last pivot points.
+// A green/red candle shows the range that price has risen/fallen since the last swing low/high
+// As with the normal ATR, this can be used to set price targets, stoplosses, to gauge volatility,...
+//
+// I added an option to insert a commission/fee percentage to make it easy to see if a timeframe is worth trading
+// or if you will likely get "eaten" by fees.
+// (note the fee should be entered per transaction!! The indicator will calculate it one time for entry and once for exit)
+//
+// The indicator can be displayed in percentage or in absolute value/ticks
+// The normal ATR is added too, so you don't have to chose which one you add to your chart! ;-)
+//
+// if you find other uses, please leave your ideas in the comments!
+//
+// Shoutout to Everget for the awesome Jurik code!!
+//
+// JD.
+//
+// #NotTradingAdvice
+// #DYOR
+
+study("Average Pivot Range - JD", overlay=false, shorttitle="APR - JD")
+length = input(title="Length", type=input.integer, defval=10)
+phase = input(title="Phase", type=input.integer, defval=50)
+power = input(title="Power", type=input.integer, defval=2)
+do_split = input(true, title="Split averge up and down range?")
+avg_len = input(title="Averaging Length", type=input.integer, defval=14)
+percent = input(true, title="show range in Percent=checked, Price=unchecked?", defval=true)
+do_fee = input(true, title="show commission threshold")
+fee = input(0.075, title="fee per transaction")
+do_bars = input(true, title="show pivot bars")
+src = ohlc4
+
+// definition of "Jurik Moving Average", by Everget
+//{
+jma(_src, _length, _phase, _power) =>
+    phaseRatio = _phase < -100 ? 0.5 : _phase > 100 ? 2.5 : _phase / 100 + 1.5
+    beta = 0.45 * (_length - 1) / (0.45 * (_length - 1) + 2)
+    alpha = pow(beta, _power)
+    jma = 0.0
+    e0 = 0.0
+    e0 := (1 - alpha) * _src + alpha * nz(e0[1])
+    e1 = 0.0
+    e1 := (_src - e0) * (1 - beta) + beta * nz(e1[1])
+    e2 = 0.0
+    e2 := (e0 + phaseRatio * e1 - nz(jma[1])) * pow(1 - alpha, 2) + 
+       pow(alpha, 2) * nz(e2[1])
+    jma := e2 + nz(jma[1])
+    jma
+//}
+
+// calculate jma turning point
+//{
+jma_price = jma(src, length, phase, power)
+turn_down = rising(jma_price[1], 1) and not rising(jma_price, 1)
+turn_up = falling(jma_price[1], 1) and not falling(jma_price, 1)
+//}
+
+// calculate pivot points
+//{
+highest_1 = highest(high, 5)
+lowest_1 = lowest(low, 5)
+pivot = turn_down ? highest_1 : turn_up ? lowest_1 : na
+//}
+
+// calculate pivot ranges
+//{
+pivot_down = pivot < fixnan(pivot)[1]
+
+pivot_range      = abs(pivot - fixnan(pivot)[1]) / (percent ? src : 100) * 100
+pivot_range_up   = not pivot_down ? pivot_range : na
+pivot_range_down = pivot_down ?     pivot_range : na
+
+pivot_range_intermediate =
+ (do_split ? 1 : close < fixnan(pivot) ? -1 : 1) * 
+   (close - close[barssince(change(fixnan(pivot)) != 0)]) / (percent ? src : 100) * 100
+//}
+
+
+// array structure for storing and calculating avg and stdev from (up and down) pivot ranges //
+//{
+f_pivot_points_avg_and_stdev(_src, _a) =>
+    if not na(_src)
+        array.pop(_a)
+        array.unshift(_a, _src)
+    _avg   = array.avg(_a)
+    _stdev = array.stdev(_a)
+    [_avg, _stdev]
+
+var float[] pivots_global = array.new_float(avg_len, 0)
+var float[] pivots_up     = array.new_float(avg_len, 0)
+var float[] pivots_down   = array.new_float(avg_len, 0)
+
+[avg_global, st_dev_global] = f_pivot_points_avg_and_stdev(pivot_range,      pivots_global)
+[avg_up,     st_dev_up]     = f_pivot_points_avg_and_stdev(pivot_range_up,   pivots_up)
+[avg_down,   st_dev_down]   = f_pivot_points_avg_and_stdev(pivot_range_down, pivots_down)
+
+////////////////////////////////////////////////////////////////////////////////////////////
+//}
+
+
+// Calculate pivot lines for plots
+//{
+f_APR_lines(_src, _stdev) =>
+    _APR      = _src
+    _APR_2    = _APR / 2
+    _APR_dev  = _APR + _stdev
+    _APR_2dev = _APR + 2 * _stdev
+    [_APR, _APR_2, _APR_dev, _APR_2dev]
+    
+
+[APR,      APR_2,      APR_dev,      APR_2dev]      = f_APR_lines(avg_global, st_dev_global)
+[APR_up,   APR_up_2,   APR_up_dev,   APR_up_2dev]   = f_APR_lines(avg_up,     st_dev_up)
+[APR_down, APR_down_2, APR_down_dev, APR_down_2dev] = f_APR_lines(avg_down,   st_dev_down)
+//}
+
+// plots
+//{
+// 0-line
+hline(0, color=color.gray)
+
+// range lines
+plot(do_split ? na : APR,
+ title="Average Pivot Range",      style = plot.style_line, linewidth = 1, color = color.teal,    transp = 25)
+plot(do_split ? APR_up : na,
+ title="Average Pivot Range Up",   style = plot.style_line, linewidth = 1, color = color.lime,    transp = 25)
+plot(do_split ? -APR_down : na,
+ title="Average Pivot Range Down", style = plot.style_line, linewidth = 1, color = color.fuchsia, transp = 25)
+plot(do_split ? na : APR_2,
+ title="1/2 Average Pivot Range",         linewidth = 1, color = color.yellow, transp = 80)
+plot(do_split ? APR_up_2 : na,
+ title="1/2 Average Pivot Range Up",      linewidth = 1, color = color.green,  transp = 80)
+plot(do_split ? -APR_down_2 : na,
+ title="1/2 Average Pivot Range Down",    linewidth = 2, color = color.red,    transp = 80)
+plot(do_split ? na : APR_dev,
+ title="Average Pivot Range + dev",       linewidth = 1, color = color.yellow, transp = 80)
+plot(do_split ? APR_up_dev : na, 
+ title="Average Pivot Range Up + dev",    linewidth = 1, color = color.green,  transp = 80)
+plot(do_split ? -APR_down_dev : na,
+ title="Average Pivot Range Down + dev",  linewidth = 2, color = color.red,    transp = 80)
+plot(do_split ? na : APR_2dev,
+ title="Average Pivot Range + 2dev",      linewidth = 1, color = color.yellow, transp = 90)
+plot(do_split ? APR_up_2dev : na,
+ title="Average Pivot Range Up + 2dev",   linewidth = 1, color = color.green,  transp = 90)
+plot(do_split ? -APR_down_2dev : na,
+ title="Average Pivot Range Down + 2dev", linewidth = 2, color = color.red,    transp = 90)
+plot(do_bars  ? pivot_range_intermediate : na, linewidth = 2, style = plot.style_histogram, color = close < fixnan(pivot) ? color.red : color.green, transp = 75)
+
+// pivot values
+pivot_color = pivot < fixnan(pivot)[1] ? color.red : color.lime
+
+plot(do_split ? na : do_bars ? pivot_range : na,
+ title="Pivot Range",      style = plot.style_columns, linewidth = 6, color = pivot_color)
+plot(do_bars and do_split ? pivot_range_up : na,
+ title="Pivot Range Up",   style = plot.style_columns, linewidth = 6, color = pivot_color)
+plot(do_bars and do_split ? -pivot_range_down : na,
+ title="Pivot Range Down", style = plot.style_columns, linewidth = 6, color = pivot_color)
+plot(do_fee ? fee * 2 * (percent ? 100 : src) / 100 : na, style = plot.style_area, color = color.gray, transp = 70)
+plot(do_fee and do_split ? -fee * 2 * (percent ? 100 : src) / 100 : na, style = plot.style_area, color = color.gray, transp = 70)
+
+// atr values
+plot(atr(14) / (percent ? src : 100) * 100, title = "14 period ATR", transp=50)
+atr_1 = atr(14)
+plot(do_split ? -atr_1 / (percent ? src : 100) * 100 : na, title = "14 period ATR", transp=50)
+//}
