@@ -205,6 +205,12 @@ f_matrix_set(_m, _row_index, _column_index, _val) =>
     _columns = f_matrix_get_nr_of_columns(_m)
     array.set(_m, 2 + int((_row_index * _columns) + _column_index), _val)
 //}
+
+// function to set all elements in a 2D matrix with a value
+f_matrix_fill(_m, _val) =>
+//{
+    array.fill(_m, _val, 2)
+//}
 //}
 
 /// GET FUNCTIONS ///
