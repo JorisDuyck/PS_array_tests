@@ -870,7 +870,8 @@ for i = 1 to training_loop
     
     // set targets to random row from training
     result_data = f_matrix_get(Training_data, random_row, result)
-    f_matrix_set(Targets, 0, 0, result_data)
+    f_matrix_set(Targets, 0, 0,     result_data)
+    f_matrix_set(Targets, 0, 0, 1 - result_data)
     
     /////////////////
     // FEEDFORWARD //
