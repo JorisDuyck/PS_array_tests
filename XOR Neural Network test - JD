@@ -664,7 +664,7 @@ f_matrix_determinant_4x4(_m) =>
 //                        S(x) = (1 / (1 + e^-x))  //
 //{
 f_sigmoid(_x) =>
-    _S = 1 / (1 + exp(-1 * _x))
+    _S = 1 / (1 + exp(-1 *  _x))
 //}
 
 // function calculate the inverse Sigmoid function   //
@@ -772,6 +772,15 @@ learning_rate = input(0.1, title = "Learning rate", minval = 0.001, maxval = 1)
 // 4 rows of data                                           //
 // with 2 columns of input data and 1 column of result data //
 //////////////////////////////////////////////////////////////
+//          NETWORK SIZE           //
+//         Number of nodes         //
+/////////////////////////////////////
+Input_nodes   = 2                  //
+//                                 //
+Hidden1_nodes = 4                  //
+//                                 //
+Output_nodes  = 2                  //
+/////////////////////////////////////
 //          column names           //
 input1 = 0, input2 = 1, result = 2 //
 /////////////////////////////////////
@@ -786,31 +795,12 @@ f_matrix_set(Training_data, 3, input1, 1), f_matrix_set(Training_data, 3, input2
 /////////////////////
 /// Input vector ///
 /////////////////////
-Input_nodes = 2
 Inputs = f_matrix_init(Input_nodes, 1, 0)
-// set inputs to random row from training
-random_row  = int(min(Training_data_rows, f_prng(4)))
-// random_row  = 2
-input_data1 = f_matrix_get(Training_data, random_row, input1)
-input_data2 = f_matrix_get(Training_data, random_row, input2)
-f_matrix_set(Inputs, input1, 0, input_data1)
-f_matrix_set(Inputs, input2, 0, input_data2)
-// transpose Input vector
-Inputs_transp = f_matrix_transpose(Inputs)
-
-/////////////////////
-/// Target Matrix ///
-/////////////////////
-Targets     = f_matrix_init(1, 1, 0)
-result_data = f_matrix_get(Training_data, random_row, result)
-f_matrix_set(Targets, 0, 0, result_data)
-// f_matrix_set(Targets, 1, 0, 1 - result_data)
 
 ///////////////////////////
 /// Hidden nodes vector ///
 ///////////////////////////
 // Set hidden matrix
-Hidden1_nodes  = 2
 var float[] Hidden1 = f_matrix_init(Hidden1_nodes, 1, 0)
 Hidden1_transp      = f_matrix_transpose(Hidden1)
 
@@ -822,9 +812,12 @@ var float[] Errors_hidden = f_matrix_init(Hidden1_nodes, 1, 0)
 /////////////////////
 /// Output vector ///
 /////////////////////
-Output_nodes  = 1
 var float[] Output = f_matrix_init(Output_nodes, 1, 0)
-// Output_transp = f_matrix_transpose(Output)
+
+/////////////////////
+/// Target Matrix ///
+/////////////////////
+Targets     = f_matrix_init(Output_nodes, 1, 0)
 
 ///////////////////////////
 /// Output Error vector ///
@@ -862,6 +855,23 @@ if barstate.isfirst
 ///                 TRAINING CALCULATIONS                  ///
 //////////////////////////////////////////////////////////////
 for i = 1 to training_loop
+    //////////////////////////////////////////
+    // SELECT RANDOM TRAINING DATA FROM SET //
+    //////////////////////////////////////////
+    // set inputs to random row from training
+    random_row  = int(min(Training_data_rows, f_prng(4)))
+    input_data1 = f_matrix_get(Training_data, random_row, input1)
+    input_data2 = f_matrix_get(Training_data, random_row, input2)
+    f_matrix_set(Inputs, input1, 0, input_data1)
+    f_matrix_set(Inputs, input2, 0, input_data2)
+    
+    // transpose Input vector
+    Inputs_transp = f_matrix_transpose(Inputs)
+    
+    // set targets to random row from training
+    result_data = f_matrix_get(Training_data, random_row, result)
+    f_matrix_set(Targets, 0, 0, result_data)
+    
     /////////////////
     // FEEDFORWARD //
     /////////////////
@@ -876,7 +886,7 @@ for i = 1 to training_loop
     Weights_H_to_O_transp  = f_matrix_transpose(Weights_H_to_O)
     
     // calculate error vector
-    Errors        := f_matrix_subtraction(Output, Targets)
+    Errors        := f_matrix_subtraction(Targets, Output)
     Errors_hidden := f_matrix_mult(Weights_H_to_O_transp, Errors)
     
     // // adjust Weights and Biases
@@ -920,10 +930,8 @@ lbl_Errors := label.new(bar_index - 20, 0, text = "Errors = " + f_matrix_print(E
 var label lbl_Errors_hidden = na, label.delete(lbl_Errors_hidden)
 lbl_Errors_hidden := label.new(bar_index - 60, 0, text = "hidden Errors = " + f_matrix_print(Errors_hidden), textcolor = color.black, textalign = text.align_left)
 
-// plot(f_matrix_get(Inputs, 0, 0), color = color.yellow)
+
 plot(f_matrix_get(Errors, 0, 0), color = color.fuchsia)
-// plot(f_matrix_get(Errors, 1, 0), color = color.purple)
 plot((f_matrix_get(Inputs, 0, 0) + f_matrix_get(Inputs, 1, 0)) == 1 ? 1 : 0, color = color.yellow)
 plot(f_matrix_get(Output, 0, 0), color = color.green)
-// plot(f_matrix_get(Output, 1, 0), color = color.red)
 //}
