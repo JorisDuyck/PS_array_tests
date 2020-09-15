@@ -140,8 +140,25 @@ study("XOR test Neural Network -  JD")
 // ALWAYS DO YOUR OWN RESEARCH!
 //}
 
+/////////////////////////////////////////////////////////////////////////////////
 // Function declarations //
 //{
+
+// Psuedo random number generator, by @RicardoSantos
+//{
+//| -------------------------------------------------------------------------------|
+var float[] seed = array.new_float(size=1, initial_value=42.0)                  //-|
+f_prng(_range)=>                                                              //---|
+//| pseudo random function:                                                 // O O |
+    var float _return = 1.0                                                 //- V -|
+    float _seed = array.get(id=seed, index=0)                                //NNNN|
+    float _reseed =  271.828                                                  // A |
+    _return := ((3.1416 * _return % _seed) * _reseed) % _range                // V |
+    array.set(id=seed, index=0, value=(1 + (_seed * 1.618) % _range) + _return) //||
+    _return                                                                    // ||
+//| -------------------------------------------------------------------------------|
+//}
+
 /////////////////////////////////////////////////////////////////////////////////
 ///                             Matrix Functions                              ///
 /////////////////////////////////////////////////////////////////////////////////
@@ -394,22 +411,6 @@ f_matrix_pop_column(_m) =>
 
 /// CALCULATION FUNCTIONS ///
 //{
-
-// Psuedo random number generator, by @RicardoSantos
-//{
-//| -------------------------------------------------------------------------------|
-var float[] seed = array.new_float(size=1, initial_value=42.0)                  //-|
-f_prng(_range)=>                                                              //---|
-//| pseudo random function:                                                 // O O |
-    var float _return = 1.0                                                 //- V -|
-    float _seed = array.get(id=seed, index=0)                                //NNNN|
-    float _reseed =  271.828                                                  // A |
-    _return := ((3.1416 * _return % _seed) * _reseed) % _range                // V |
-    array.set(id=seed, index=0, value=(1 + (_seed * 1.618) % _range) + _return) //||
-    _return                                                                    // ||
-//| -------------------------------------------------------------------------------|
-//}
-
 // function to randomize the values of a 2D matrix //
 f_matrix_randomize(_m, _range) =>
 //{
@@ -652,6 +653,16 @@ f_matrix_determinant_4x4(_m) =>
             _determinant := _determinant + pow(-1, i + 1) * f_matrix_get(_m, 0, i) * f_matrix_determinant_3x3(_cofactor_matrix)
     _determinant
 //}
+
+// function to print matrix
+f_matrix_print(_m) =>
+//{
+    _text = "(" + tostring(array.get(_m, 0)) + "x" + tostring(array.get(_m, 1)) + ")"
+    _text := _text + "\n" + "\n"+"["
+    for i = 2 to array.size(_m) - 1
+        _text := _text + (i == 2 ? "" : ((i - 2) % array.get(_m, 1)) == 0 ? "]" + "\n" + "[" : " ") + tostring(array.get(_m, i))
+    _text := _text + "]"
+//}
 //}
 //}
 //}
@@ -739,20 +750,9 @@ f_backpropagation(_Inputs_transp, _Weights, _Bias, _Outputs, _Errors, _learning_
     f_matrix_replace(_Weights, _Weights_adj)
     //}
 //}
-//}
 
-// function to print matrix
-f_matrix_print(_m) =>
-//{
-    _text = "(" + tostring(array.get(_m, 0)) + "x" + tostring(array.get(_m, 1)) + ")"
-    _text := _text + "\n" + "\n"+"["
-    for i = 2 to array.size(_m) - 1
-        _text := _text + (i == 2 ? "" : ((i - 2) % array.get(_m, 1)) == 0 ? "]" + "\n" + "[" : " ") + tostring(array.get(_m, i))
-    _text := _text + "]"
-//}
 //}
 /////////////////////////////////////////////////////////////////////////////////
-//}
 
 /////////////////////////////////////////////////////////////////////////////////
 ///                             Main Script                                   ///
@@ -817,7 +817,7 @@ var float[] Output = f_matrix_init(Output_nodes, 1, 0)
 /////////////////////
 /// Target Matrix ///
 /////////////////////
-Targets     = f_matrix_init(Output_nodes, 1, 0)
+var float[] Targets = f_matrix_init(Output_nodes, 1, 0)
 
 ///////////////////////////
 /// Output Error vector ///
@@ -897,38 +897,39 @@ for i = 1 to training_loop
 
 // DEBUG PLOTS //
 //{
-var label lbl_Training_data = na, label.delete(lbl_Training_data)
-lbl_Training_data := label.new(bar_index - 110, 0, text = "Training_data = " + f_matrix_print(Training_data), color = color.gray, textalign = text.align_left)
+if barstate.islast
+    var label lbl_Training_data = na, label.delete(lbl_Training_data)
+    lbl_Training_data := label.new(bar_index - 110, 0, text = "Training_data = " + f_matrix_print(Training_data), color = color.gray, textalign = text.align_left)
 
-var label lbl_Inputs = na, label.delete(lbl_Inputs)
-lbl_Inputs := label.new(bar_index - 100, 0, text = "random Inputs = " + f_matrix_print(Inputs), color = color.gray, textalign = text.align_left)
+    var label lbl_Inputs = na, label.delete(lbl_Inputs)
+    lbl_Inputs := label.new(bar_index - 100, 0, text = "random Inputs = " + f_matrix_print(Inputs), color = color.gray, textalign = text.align_left)
 
-var label lbl_Targets = na, label.delete(lbl_Targets)
-lbl_Targets := label.new(bar_index - 10, 0, text = "Targets = " + f_matrix_print(Targets), color = color.gray, textalign = text.align_left)
+    var label lbl_Targets = na, label.delete(lbl_Targets)
+    lbl_Targets := label.new(bar_index - 10, 0, text = "Targets = " + f_matrix_print(Targets), color = color.gray, textalign = text.align_left)
 
-var label lbl_Weights_I_to_H = na, label.delete(lbl_Weights_I_to_H)
-lbl_Weights_I_to_H := label.new(bar_index - 90, 0, text = "Weights_I_to_H = " + f_matrix_print(Weights_I_to_H), color = color.gray, textalign = text.align_left)
+    var label lbl_Weights_I_to_H = na, label.delete(lbl_Weights_I_to_H)
+    lbl_Weights_I_to_H := label.new(bar_index - 90, 0, text = "Weights_I_to_H = " + f_matrix_print(Weights_I_to_H), color = color.gray, textalign = text.align_left)
 
-var label lbl_Bias_I_to_H = na, label.delete(lbl_Bias_I_to_H)
-lbl_Bias_I_to_H := label.new(bar_index - 80, 0, text = "Bias_I_to_H = " + f_matrix_print(Bias_I_to_H), color = color.gray, textalign = text.align_left)
+    var label lbl_Bias_I_to_H = na, label.delete(lbl_Bias_I_to_H)
+    lbl_Bias_I_to_H := label.new(bar_index - 80, 0, text = "Bias_I_to_H = " + f_matrix_print(Bias_I_to_H), color = color.gray, textalign = text.align_left)
         
-var label lbl_Hidden1 = na, label.delete(lbl_Hidden1)
-lbl_Hidden1 := label.new(bar_index - 70, 0, text = "Hidden1 = " + f_matrix_print(Hidden1), color = color.gray, textalign = text.align_left)
+    var label lbl_Hidden1 = na, label.delete(lbl_Hidden1)
+    lbl_Hidden1 := label.new(bar_index - 70, 0, text = "Hidden1 = " + f_matrix_print(Hidden1), color = color.gray, textalign = text.align_left)
     
-var label lbl_Weights_H_to_O = na, label.delete(lbl_Weights_H_to_O)
-lbl_Weights_H_to_O := label.new(bar_index - 50, 0, text = "Weights_H_to_O = " + f_matrix_print(Weights_H_to_O), color = color.gray, textalign = text.align_left)
+    var label lbl_Weights_H_to_O = na, label.delete(lbl_Weights_H_to_O)
+    lbl_Weights_H_to_O := label.new(bar_index - 50, 0, text = "Weights_H_to_O = " + f_matrix_print(Weights_H_to_O), color = color.gray, textalign = text.align_left)
 
-var label lbl_Bias_H_to_O = na, label.delete(lbl_Bias_H_to_O)
-lbl_Bias_H_to_O := label.new(bar_index - 40, 0, text = "Bias_H_to_O = " + f_matrix_print(Bias_H_to_O), color = color.gray, textalign = text.align_left)
+    var label lbl_Bias_H_to_O = na, label.delete(lbl_Bias_H_to_O)
+    lbl_Bias_H_to_O := label.new(bar_index - 40, 0, text = "Bias_H_to_O = " + f_matrix_print(Bias_H_to_O), color = color.gray, textalign = text.align_left)
         
-var label lbl_Output = na, label.delete(lbl_Output)
-lbl_Output := label.new(bar_index - 30, 0, text = "Output = " + f_matrix_print(Output), color = color.gray, textalign = text.align_left)
+    var label lbl_Output = na, label.delete(lbl_Output)
+    lbl_Output := label.new(bar_index - 30, 0, text = "Output = " + f_matrix_print(Output), color = color.gray, textalign = text.align_left)
     
-var label lbl_Errors = na, label.delete(lbl_Errors)
-lbl_Errors := label.new(bar_index - 20, 0, text = "Errors = " + f_matrix_print(Errors), textcolor = color.black, textalign = text.align_left)
+    var label lbl_Errors = na, label.delete(lbl_Errors)
+    lbl_Errors := label.new(bar_index - 20, 0, text = "Errors = " + f_matrix_print(Errors), textcolor = color.black, textalign = text.align_left)
 
-var label lbl_Errors_hidden = na, label.delete(lbl_Errors_hidden)
-lbl_Errors_hidden := label.new(bar_index - 60, 0, text = "hidden Errors = " + f_matrix_print(Errors_hidden), textcolor = color.black, textalign = text.align_left)
+    var label lbl_Errors_hidden = na, label.delete(lbl_Errors_hidden)
+    lbl_Errors_hidden := label.new(bar_index - 60, 0, text = "hidden Errors = " + f_matrix_print(Errors_hidden), textcolor = color.black, textalign = text.align_left)
 
 
 plot(f_matrix_get(Errors, 0, 0), color = color.fuchsia)
