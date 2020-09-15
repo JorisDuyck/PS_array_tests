@@ -664,7 +664,7 @@ f_matrix_determinant_4x4(_m) =>
 //                        S(x) = (1 / (1 + e^-x))  //
 //{
 f_sigmoid(_x) =>
-    _S = 1 / (1 + exp(_x))
+    _S = 1 / (1 + exp(-1 * _x))
 //}
 
 // function calculate the inverse Sigmoid function   //
