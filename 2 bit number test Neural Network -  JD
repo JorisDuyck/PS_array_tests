@@ -859,7 +859,7 @@ Output_nodes  = 4                  //
 //      activation function        //
 // options:                        //
 // "Sigm", "Tanh",                 //
-//  "Relu", "lReLu", "SoftMax"     //
+// "Relu", "lReLu", "SoftMax"      //
 act_fn_I_H = "Tanh"                //
 act_fn_H_O = "Tanh"                //
 /////////////////////////////////////
