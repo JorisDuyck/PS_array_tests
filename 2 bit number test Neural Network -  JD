@@ -895,7 +895,6 @@ Inputs = f_matrix_init(Input_nodes, 1, 0)
 ///////////////////////////
 // Set hidden matrix
 var float[] Hidden1 = f_matrix_init(Hidden1_nodes, 1, 0)
-Hidden1_transp      = f_matrix_transpose(Hidden1)
 
 ///////////////////////////
 /// Hidden Error vector ///
