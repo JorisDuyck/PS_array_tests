@@ -677,38 +677,103 @@ f_matrix_print(_m) =>
 // Neural Network functions //
 //////////////////////////////
 //{
-// function calculate the Sigmoid function         //
+// ACTIVATION FUNCTIONS AND DERIVATIVES //
+
+// function calculate the "Sigmoid" function   range = (0, 1)//
 //                        S(x) = (1 / (1 + e^-x))  //
 //{
 f_sigmoid(_x) =>
     _S = 1 / (1 + exp(-1 *  _x))
 //}
 
-// function calculate the inverse Sigmoid function   //
+// function calculate the derivative of the "Sigmoid" function   //
 //                        S'(x) = S(x) * (1 - S(x))  //
 //{
-f_inv_sigmoid(_x) =>
-    _sigm_x = f_sigmoid(_x)
-    _inv_S  = _sigm_x * (1 - _sigm_x)
-    _inv_S
+f_d_sigmoid(_x) =>
+    _d_S  = _x * (1 - _x)
 //}
 
-// function to map a 2D matrices with a Sigmoid function               //
-//                                      S(x) = (1 / (1 + e^-x))  //
-f_matrix_sigmoid(_m) =>
+// function calculate the "tanh" function     range = (-1, 1)//
+//                        _tanh(x) = (e^x - e^-x) / (e^x + e^-x)  //
+//{
+f_tanh(_x) =>
+    _tanh = (exp(_x) -exp(-1 * _x)) / (exp(_x) + exp(-1 *  _x))
+//}
+
+// function calculate the derivative of the "tan"h function         //
+//                        _tanh(x) = (e^x - e^-x) / (e^x + e^-x)  //
+//{
+f_d_tanh(_x) =>
+    _d_tanh = (1 - pow(_x, 2))
+//}
+
+// function calculate the "ReLu" function      range = (-inf, inf)    //
+//{
+f_ReLu(_x) =>
+    _ReLu = max(0, _x)
+//}
+
+// function calculate the derivative of the "ReLu" function         //
+//{
+f_d_ReLu(_x) =>
+    _d_ReLu = _x < 0 ? 0 : 1
+//}
+
+// function calculate the "leaky ReLu" function     range = (-inf, inf)   //
+//{
+f_leaky_ReLu(_x) =>
+    _leaky_ReLu = max(0.01 * _x, _x)
+//}
+
+// function calculate the derivative of the "leaky ReLu" function         //
+//{
+f_d_leaky_ReLu(_x) =>
+    _d_leaky_ReLu = _x < 0 ? 0.01 : 1
+//}
+
+// function calculate "SoftMax" values of the output vector               //
+//{
+f_softmax(_m, _x) =>
+    _exp_sum = 0.0
+    for i = 2 to array.size(_m) - 1
+        _value    = array.get(_m, i)
+        _exp_sum := _exp_sum + exp(_value)
+    _softmax = exp(_x) / _exp_sum
+    _softmax
+//}
+//
+// function calculate the derivative of the "SoftMax" values of the output vector //
+//{
+f_d_softmax(_m, _x) =>
+    _exp_sum      = 0.0
+    for i = 2 to array.size(_m) - 1
+        _value    = array.get(_m, i)
+        _exp_sum := _exp_sum + exp(_value)
+    _value_exp_sum = exp(_x) * (_exp_sum - exp(_x))
+    _d_softmax = _value_exp_sum / pow(_exp_sum, 2)
+    _d_softmax
+//}
+
+// function to map a 2D matrices with the activation function          //
+f_matrix_activation(_m, _act_fn) =>
 //{
     [_rows, _columns] = f_matrix_get_size(_m)
     _return_array = f_matrix_init(_rows, _columns, 0)
     for i = 0  to _rows - 1
         for j = 0  to _columns - 1
             _value = f_matrix_get(_m, i, j)
-            f_matrix_set(_return_array, i, j, f_sigmoid(_value))
+            _activation =
+             _act_fn == "Sigm"  ? f_sigmoid(_value)    :
+             _act_fn == "Tanh"  ? f_tanh(_value)       :
+             _act_fn == "ReLu"  ? f_ReLu(_value)       :
+             _act_fn == "lReLu" ? f_leaky_ReLu(_value) : f_softmax(_m, _value)
+            f_matrix_set(_return_array, i, j, _activation)
     _return_array
 //}
 
 // function to map a 2D matrices with a inverse Sigmoid function    //
 //                                      S'(x) = S(x) * (1 - S(x))  //
-f_matrix_inverse_sigmoid(_m) =>
+f_matrix_inverse_activation(_m, _act_fn) =>
 //{
     // inverse Sigmoid function
     // S'(x) =  S(x)  * (1 -  S(x)) 
@@ -718,23 +783,27 @@ f_matrix_inverse_sigmoid(_m) =>
     for i = 0  to _rows - 1
         for j = 0  to _columns - 1
             _value = f_matrix_get(_m, i, j)
-            f_matrix_set(_return_array, i, j, _value * (1 - _value))
+            _derivative =
+             _act_fn == "Sigm"  ? f_d_sigmoid(_value)    : 
+             _act_fn == "Tanh"  ? f_d_tanh(_value)       : 
+             _act_fn == "ReLu"  ? f_d_ReLu(_value)       :
+             _act_fn == "lReLu" ? f_d_leaky_ReLu(_value) : f_d_softmax(_m, _value)
+            f_matrix_set(_return_array, i, j, _derivative)
     _return_array
 //}
 
 // Feedforward function //
-f_feedforward(_Inputs, _Weights, _Bias) =>
+f_feedforward(_Inputs, _Weights, _Bias, _act_fn) =>
 //{
-    /////   Output = Input x Weights + Bias /////
-    
-    _weighted_inputs = f_matrix_mult( _Weights, _Inputs)
-    _Output          = f_matrix_addition(_weighted_inputs, _Bias)
-    _Output_sigm     = f_matrix_sigmoid(_Output)
-    _Output_sigm
+    /////   Output = activation fn(Input x Weights + Bias) /////
+    _weighted_inputs   = f_matrix_mult(            _Weights, _Inputs)
+    _biased_Output     = f_matrix_addition(_weighted_inputs,   _Bias)
+    _Output_activation = f_matrix_activation(_biased_Output, _act_fn)
+    _Output_activation
 //}
 
 // Backpropagation function //
-f_backpropagation(_Inputs_transp, _Weights, _Bias, _Outputs, _Errors, _learning_rate) =>
+f_backpropagation(_Inputs_transp, _Weights, _Bias, _Outputs, _Errors, _learning_rate, _act_fn) =>
 //{
     ///// delta Bias    = learning rate x Errors x (Output x (1 - Output)                    /////
     ///// delta Weights = learning rate x Errors x (Output x (1 - Output) x Input transposed /////
@@ -742,15 +811,15 @@ f_backpropagation(_Inputs_transp, _Weights, _Bias, _Outputs, _Errors, _learning_
     // learning rate x Errors
     _gradient      = f_matrix_scalar_multiply(_Errors, _learning_rate)
     
-    // (Output x (1 - Output)
-    _inv_sigmoid   = f_matrix_inverse_sigmoid(_Outputs)
+    // derivative of the activation
+    _d_activation  = f_matrix_inverse_activation(_Outputs, _act_fn)
     
-    // delta Bias    = learning rate x Errors x (Output x (1 - Output)  
-    _delta_bias    = f_matrix_mult_elem(_gradient, _inv_sigmoid)
-    _Bias_adj      = f_matrix_addition(     _Bias,  _delta_bias)
+    // delta Bias    = learning rate x Errors x d(activation)  
+    _delta_bias    = f_matrix_mult_elem(_gradient, _d_activation)
+    _Bias_adj      = f_matrix_addition(     _Bias,   _delta_bias)
     f_matrix_replace(_Bias, _Bias_adj)
     
-    // delta Weights = learning rate x Errors x (Output x (1 - Output) x Input transposed
+    // delta Weights = learning rate x Errors x d(activation) x Input transposed
     _delta_weights = f_matrix_mult( _delta_bias, _Inputs_transp)
     _Weights_adj   = f_matrix_addition(_Weights, _delta_weights)
     f_matrix_replace(_Weights, _Weights_adj)
@@ -786,12 +855,19 @@ Input_nodes   = 2                  //
 Hidden1_nodes = 8                  //
 //                                 //
 Output_nodes  = 4                  //
+//                                 //
+//      activation function        //
+// options:                        //
+// "Sigm", "Tanh",                 //
+//  "Relu", "lReLu", "SoftMax"     //
+act_fn_I_H = "Tanh"                //
+act_fn_H_O = "Tanh"                //
 /////////////////////////////////////
 //          column names           //
 input1 = 0, input2 = 1             //
 result = 2                         //
 /////////////////////////////////////
-
+//
 /////////////////////
 /// Training Data ///
 /////////////////////
@@ -893,8 +969,8 @@ for i = 1 to training_loop
     // FEEDFORWARD //
     /////////////////
     // calculate output vector
-    Hidden1 := f_feedforward(Inputs,  Weights_I_to_H, Bias_I_to_H)
-    Output  := f_feedforward(Hidden1, Weights_H_to_O, Bias_H_to_O)
+    Hidden1 := f_feedforward(Inputs,  Weights_I_to_H, Bias_I_to_H, act_fn_H_O)
+    Output  := f_feedforward(Hidden1, Weights_H_to_O, Bias_H_to_O, act_fn_I_H)
     
     /////////////////////
     // BACKPROPAGATION //
@@ -907,8 +983,8 @@ for i = 1 to training_loop
     Errors_hidden := f_matrix_mult(Weights_H_to_O_transp, Errors)
     
     // // adjust Weights and Biases
-    f_backpropagation(Hidden1_transp, Weights_H_to_O, Bias_H_to_O,  Output,        Errors, learning_rate)
-    f_backpropagation( Inputs_transp, Weights_I_to_H, Bias_I_to_H, Hidden1, Errors_hidden, learning_rate)
+    f_backpropagation(Hidden1_transp, Weights_H_to_O, Bias_H_to_O,  Output,        Errors, learning_rate, act_fn_H_O)
+    f_backpropagation( Inputs_transp, Weights_I_to_H, Bias_I_to_H, Hidden1, Errors_hidden, learning_rate, act_fn_I_H)
 //////////////////////////////////////////////////////////////
 //}
 
@@ -949,8 +1025,8 @@ if barstate.islast
     var label lbl_Errors_hidden = na, label.delete(lbl_Errors_hidden)
     lbl_Errors_hidden := label.new(bar_index - 60, 0, text = "hidden Errors = " + f_matrix_print(Errors_hidden), textcolor = color.black, textalign = text.align_left)
 
-
+//
 plot(f_matrix_get(Errors, 0, 0), color = color.fuchsia)
-plot(f_matrix_get(Output, 0, 0), color = color.green)
+plot(f_matrix_get(Errors, 1, 0), color = color.red)
 //}
 //}
